@@ -1,14 +1,16 @@
-from typing import Type, Dict
 import pulsar
 from pulsar.schema import Record, BytesSchema, JsonSchema
-from pulsar.schema import String, Integer, Boolean
-import asyncio
+from pulsar.schema import String, Boolean
+# import asyncio
 import aiofiles
 import aiopulsar
 import os
 
 
 class FileMetadata(Record):
+    """
+    Формат словаря для отправки метаданных с подтверждением получения файлов
+    """
     deviceName = String()
     deviceSerialNumber = String()
     fileName = String()
@@ -20,6 +22,13 @@ async def send_metadata(
         metadata: FileMetadata,
         topic: str = 'confirmation'
 ) -> None:
+    """
+    Функция отправки метаданных о получении файлов очередью pulsar
+    :param pulsar_host: сервер очереди pulsar ip:port
+    :param metadata: объект класса FileMetadata
+    :param topic: топик очереди (отличный от топика для отправки файлов)
+    :return: None
+    """
 
     async with aiopulsar.connect(f'pulsar://{pulsar_host}') as client:
         async with client.create_producer(
@@ -59,7 +68,9 @@ async def get_json_meta(
                     print(data)
 
                     if data.isExist:
-                        # Можно вставить вызов функции удаления файла
+                        # Здесь может быть добавлен вызов функции удаления
+                        # успешно переданного файла
+
                         print(f'Файл '
                               f'{data.deviceName}/'
                               f'{data.deviceSerialNumber}/'
@@ -121,14 +132,14 @@ async def transfer_one_file(
 
 
 async def get_files(
-        pulsar_host: str = 'nii.global:6650',
-        out_dir: str = 'out',
+        pulsar_host: str,
+        out_dir: str,
         topic: str = 'file_transfer'
 ) -> None:
 
     """
     Функция получения бинарных сообщений в режиме chunking
-    :param host: сервер очереди pulsar  ip:port
+    :param pulsar_host: сервер очереди pulsar  ip:port
     :param out_dir: каталог для сохранения файлов
     :param topic: топик очереди
     :return: None
@@ -199,6 +210,7 @@ async def get_files(
 
 if __name__ == "__main__":
     pass
+
 # Пример использования:
 
     # host = 'nii.global:6650'

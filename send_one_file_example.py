@@ -1,16 +1,16 @@
 import asyncio
 from pulsar_file_transfer import transfer_one_file
 import os
-from dotenv import load_dotenv
 import config
 
-load_dotenv()
 
-host = os.getenv('HOST')
+host = config.HOST
 topic = config.TOPIC_FILE
+
 device = 'DEVICE-XXX'
 serial = '1234'
 file = 'in.middle/unetbootin-mac-702.dmg'
+
 size = str(os.stat(file).st_size)
 filename = file.split('/')[-1]
 
