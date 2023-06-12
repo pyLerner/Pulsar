@@ -1,7 +1,0 @@
-aiofiles
-asyncio>=3.4.3
-certifi
-click
-pulsar-client==3.1.0
-python-dotenv
-aiohttp>=3.8.3

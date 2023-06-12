@@ -6,7 +6,6 @@ from typing import List, Tuple
 # Пример http каталога
 url = 'https://mirror.yandex.ru/gentoo-distfiles/distfiles/00/'
 
-
 async def parsing(url: str) -> List:
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
@@ -33,7 +32,11 @@ async def download_file(
         return url, await response.read()
 
 
-async def download_multiple(url: str, session: aiohttp.ClientSession):
+async def download_multiple(
+        url: str,
+        session: aiohttp.ClientSession
+) -> List:
+
     urls = await parsing(url)
 
     # Ограничение количества файлов: N (для демонстрации)
@@ -50,6 +53,7 @@ async def download_multiple(url: str, session: aiohttp.ClientSession):
 async def main():
     async with aiohttp.ClientSession() as session:
         result = await download_multiple(url, session)
+        print(type(result))
         print('finished:', result)
 
 
