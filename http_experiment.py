@@ -1,12 +1,18 @@
 import asyncio
+# import os
+
 import aiohttp
+import aiofiles
+from aiofiles import os
+
 import re
 from typing import List, Tuple
 
 # Пример http каталога
-url = 'https://mirror.yandex.ru/gentoo-distfiles/distfiles/00/'
+url_example = 'https://mirror.yandex.ru/gentoo-distfiles/distfiles/00/'
 
-async def parsing(url: str) -> List:
+
+async def parsing(url: str) -> Tuple[List[str], List[str]]:
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             print(resp.status)
@@ -17,19 +23,27 @@ async def parsing(url: str) -> List:
             files = list(map(lambda x: x[1:-1], text[1:]))
             urls = list(map(lambda x: url + x, files))
 
-            return urls
+            return files, urls
 
 
 async def download_file(
         session: aiohttp.ClientSession,
-        url: str
-) -> Tuple:
+        url: str,
+        filename: str
+) -> Tuple[str, bytes]:
 
     async with session.get(url) as response:
         assert response.status == 200
+        data = await response.read()
+
+        async with aiofiles.open('out/'+filename, 'wb') as f:
+
+            await f.write(data)
 
         # For large files use response.content.read(chunk_size) instead.
-        return url, await response.read()
+        return filename, await response.read()
+
+# async def save_file(data: bytes) -> None:
 
 
 async def download_multiple(
@@ -37,24 +51,33 @@ async def download_multiple(
         session: aiohttp.ClientSession
 ) -> List:
 
-    urls = await parsing(url)
+    files, urls = await parsing(url)
 
-    # Ограничение количества файлов: N (для демонстрации)
-    N = 3
+    # Ограничение количества файлов: n (для демонстрации)
+    n = 10
 
-    download_futures = [download_file(session, ur) for ur in urls[:N]]
+    download_futures = [
+        download_file(
+            session,
+            ur,
+            file
+        ) for file, ur in zip(
+            files,
+            urls[:n]
+        )
+    ]
     print('Results')
     for download_future in asyncio.as_completed(download_futures):
         result = await download_future
-        print('finished:', result)
+        # print(url)
+        # print('finished:', result)
     return urls
 
 
 async def main():
     async with aiohttp.ClientSession() as session:
-        result = await download_multiple(url, session)
-        print(type(result))
-        print('finished:', result)
+        result = await download_multiple(url_example, session)
+        print('finished:', await os.listdir('out'))
 
 
 if __name__ == "__main__":

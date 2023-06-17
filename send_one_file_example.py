@@ -5,7 +5,7 @@ import config
 
 
 host = config.HOST
-topic = config.TOPIC_FILE
+topic_file = config.TOPIC_FILE
 
 device = 'DEVICE-XXX'
 serial = '1234'
@@ -27,7 +27,7 @@ async def main():
         filename=filename,
         data=data,
         size=size,
-        topic=topic
+        topic=topic_file
     )
 
 asyncio.run(main())

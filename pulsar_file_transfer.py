@@ -90,7 +90,7 @@ async def transfer_one_file(
         filename: str,
         data: bytes,
         size: str,
-        topic='file_transfer',
+        topic: str,
 ) -> None:
 
     """
@@ -134,7 +134,7 @@ async def transfer_one_file(
 async def get_files(
         pulsar_host: str,
         out_dir: str,
-        topic: str = 'file_transfer'
+        topic: str
 ) -> None:
 
     """
