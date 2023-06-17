@@ -1,10 +1,10 @@
 import pulsar
 from pulsar.schema import Record, BytesSchema, JsonSchema
 from pulsar.schema import String, Boolean
-# import asyncio
+from typing import List
 import aiofiles
 import aiopulsar
-import os
+from aiofiles import os
 
 
 class FileMetadata(Record):
@@ -83,6 +83,7 @@ async def get_json_meta(
                     await consumer_JSON.negative_acknowledge(msg)
 
 
+#:TODO properties сделать функцией
 async def transfer_one_file(
         pulsar_host: str,
         device: str,
@@ -131,6 +132,63 @@ async def transfer_one_file(
             print(f'Файл {filename} с устройства {device} передан')
 
 
+#TODO: сделать properties функцией
+async def transfer_files(
+        pulsar_host: str,
+        device: str,
+        serial: str,
+        topic: str
+) -> List:
+
+    async with aiopulsar.connect(f'pulsar://{pulsar_host}') as client:
+        async with client.create_producer(
+            topic,
+            schema=BytesSchema(),
+            chunking_enabled=True,
+            send_timeout_millis=200_000,     # увеличивает допустимый таймаут от брокера
+        ) as producer_file:
+
+            await producer_file.flush()
+
+            tasks = []
+            for name in await aiofiles.os.listdir(device):
+
+                file = device + "/" + name
+                print(file)
+                size = await aiofiles.os.stat(file)
+                size = size.st_size
+
+                print(file)
+
+                async with aiofiles.open(file, 'rb') as f:
+                    data = await f.read()
+
+                # print(data)
+
+                properties = {
+                    'deviceModel': device,
+                    'serialNumber': serial,
+                    'fileName': name,
+                    'fileSize': str(size)
+                }
+
+                print(properties)
+
+                task = await producer_file.send(
+                            data,
+                            properties,     # Передача имени файла и размера вместе с байтами
+                            # deliver_at=10,
+                            # deliver_after=timedelta(seconds=100)
+                        )
+
+                tasks.append(task)
+                print(f'{file} was appended in task')
+
+            print(f'Файлы с устройства {device} переданы')
+
+            return tasks
+
+
 async def get_files(
         pulsar_host: str,
         out_dir: str,
@@ -152,7 +210,7 @@ async def get_files(
                 schema=BytesSchema(),
                 auto_ack_oldest_chunked_message_on_queue_full=True,
                 max_pending_chunked_message=10,
-                initial_position=pulsar.InitialPosition.Earliest,
+                initial_position=pulsar.InitialPosition.Latest,
                 receiver_queue_size=5000
         ) as consumer_file:
 
@@ -161,7 +219,7 @@ async def get_files(
                 try:
                     data = msg.value()
 
-                    print(msg.properties())
+                    print(f'Получено {msg.properties()}')
 
                     name = msg.properties()['fileName']
 
@@ -172,14 +230,18 @@ async def get_files(
                     # Сюда можно добавить создание подкаталогов для каждого устройства
                     # ...
 
-                    name = os.path.join(out_dir, name)
+                    name = out_dir + "/" + name
+                    # name = os.path.join(out_dir, name)
 
                     async with aiofiles.open(name, 'wb') as file:
                         await file.write(data)
                         await file.flush()
 
                         # Проверка размера файла
-                        if os.stat(name).st_size == int(size):
+                        n_size = await aiofiles.os.stat(name)
+                        n_size = n_size.st_size
+
+                        if n_size == int(size):
                             is_exist = True
                         else:
                             is_exist = False
@@ -200,7 +262,7 @@ async def get_files(
                         metadata=metadata
                     )
 
-                    print('metadata was sent')
+                    print(f'Отправка метаданных о получении {metadata}')
 
                     await consumer_file.acknowledge(msg)
 

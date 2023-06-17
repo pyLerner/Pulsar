@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 HOST = os.getenv('HOST')
+print(HOST)
 TOPIC_FILE = 'transfer_file'
 TOPIC_META = 'confirmation'
 
