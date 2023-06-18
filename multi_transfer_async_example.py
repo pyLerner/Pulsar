@@ -12,6 +12,8 @@ topic = config.TOPIC_FILE
 async def main():
 
     device = asyncio.create_task(
+
+        # Вызов функции передачи в очередь группы файлов из каталога (устройства)
         transfer_files(
             pulsar_host=host,
             device=config.DEVICE_2,

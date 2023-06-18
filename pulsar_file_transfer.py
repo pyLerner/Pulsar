@@ -1,3 +1,5 @@
+import asyncio
+
 import pulsar
 from pulsar.schema import Record, BytesSchema, JsonSchema
 from pulsar.schema import String, Boolean
@@ -5,6 +7,7 @@ from typing import List
 import aiofiles
 import aiopulsar
 from aiofiles import os
+from datetime import datetime
 
 
 class FileMetadata(Record):
@@ -15,6 +18,19 @@ class FileMetadata(Record):
     deviceSerialNumber = String()
     fileName = String()
     isExist = Boolean()
+
+
+def log_print(string: str) -> None:
+    """
+    Печать в выводом времемени в начале строки и ключевого слова MAIN
+    :param string: строка для печати
+    :return: None
+    """
+    print(
+        f'{datetime.now().isoformat(timespec="milliseconds").replace("T", " ")}'
+        f' MAIN'
+        f'  {string}'
+    )
 
 
 async def send_metadata(
@@ -65,13 +81,13 @@ async def get_json_meta(
                 msg = await consumer_JSON.receive()
                 try:
                     data = msg.value()
-                    print(data)
+                    log_print(f'Отправка метаданных о файле {data}')
 
                     if data.isExist:
                         # Здесь может быть добавлен вызов функции удаления
                         # успешно переданного файла
 
-                        print(f'Файл '
+                        log_print(f'Файл '
                               f'{data.deviceName}/'
                               f'{data.deviceSerialNumber}/'
                               f'{data.fileName} '
@@ -129,7 +145,7 @@ async def transfer_one_file(
                 properties,     # Передача имени файла и размера вместе с байтами
             )
 
-            print(f'Файл {filename} с устройства {device} передан')
+            log_print(f'Файл {filename} с устройства {device} передан')
 
 
 #TODO: сделать properties функцией
@@ -154,16 +170,12 @@ async def transfer_files(
             for name in await aiofiles.os.listdir(device):
 
                 file = device + "/" + name
-                print(file)
+                log_print(f'Передача файла {file}')
                 size = await aiofiles.os.stat(file)
                 size = size.st_size
 
-                print(file)
-
                 async with aiofiles.open(file, 'rb') as f:
                     data = await f.read()
-
-                # print(data)
 
                 properties = {
                     'deviceModel': device,
@@ -172,7 +184,7 @@ async def transfer_files(
                     'fileSize': str(size)
                 }
 
-                print(properties)
+                log_print(f'Передача свойств файла {str(properties)}')
 
                 task = await producer_file.send(
                             data,
@@ -182,9 +194,9 @@ async def transfer_files(
                         )
 
                 tasks.append(task)
-                print(f'{file} was appended in task')
+                log_print(f'{file} поставлен в очередь задач')
 
-            print(f'Файлы с устройства {device} переданы')
+            log_print(f'Файлы с устройства {device} переданы')
 
             return tasks
 
@@ -219,10 +231,15 @@ async def get_files(
                 try:
                     data = msg.value()
 
-                    print(f'Получено {msg.properties()}')
+                    log_print(f'Получено сообщение о файле {msg.properties()}')
 
-                    name = msg.properties()['fileName']
+                    ############ QUEUEE CLEANING ################
+                    if 'fileName' not in msg.properties().keys():
+                        log_print(f'Свойства сообщания не соответсвуют формату. Отбрасывается.')
+                        await consumer_file.acknowledge(msg)
+                    #############################################
 
+                    initial_name = msg.properties()['fileName']
                     device = msg.properties()['deviceModel']
                     serial = msg.properties()['serialNumber']
                     size = msg.properties()['fileSize']
@@ -230,7 +247,7 @@ async def get_files(
                     # Сюда можно добавить создание подкаталогов для каждого устройства
                     # ...
 
-                    name = out_dir + "/" + name
+                    name = out_dir + "/" + initial_name
                     # name = os.path.join(out_dir, name)
 
                     async with aiofiles.open(name, 'wb') as file:
@@ -246,14 +263,14 @@ async def get_files(
                         else:
                             is_exist = False
 
-                    print(f'файл {name} доставлен '
-                          f'и может быть удален с устройства '
-                          f'{device} / {serial}')
+                        log_print(f'файл {name} доставлен '
+                              f'и может быть удален с устройства '
+                              f'{device} / {serial}')
 
                     metadata = FileMetadata(
                         deviceName=device,
                         deviceSerialNumber=serial,
-                        fileName=name,
+                        fileName=initial_name,
                         isExist=is_exist
                     )
 
@@ -262,7 +279,7 @@ async def get_files(
                         metadata=metadata
                     )
 
-                    print(f'Отправка метаданных о получении {metadata}')
+                    log_print(f'Отправка метаданных о получении файла {metadata}')
 
                     await consumer_file.acknowledge(msg)
 
@@ -272,32 +289,3 @@ async def get_files(
 
 if __name__ == "__main__":
     pass
-
-# Пример использования:
-
-    # host = 'nii.global:6650'
-    # device = 'DEVICE-XXX'
-    # serial = '1234'
-    # filename = 'in/501.png'
-    # size = os.stat(filename).st_size
-    #
-    # async def main():
-    #
-    #     await get_files(
-    #         pulsar_host=host,
-    #         out_dir='out'
-    #     )
-    #
-    #     with open(filename, 'rb') as f:
-    #         data = f.read()
-    #
-    #         await transfer_one_file(
-    #             pulsar_host=host,
-    #             device=device,
-    #             serial=serial,
-    #             filename=filename,
-    #             data=data,
-    #             size=str(size)
-    #         )
-    #
-    # asyncio.run(main())
